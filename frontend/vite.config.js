@@ -5,6 +5,6 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   build: {
-    outDir: 'build' // This forces Vite to create a 'build' folder instead of 'dist'
+    outDir: 'dist' // This forces Vite to create a 'build' folder instead of 'dist'
   }
 })
