@@ -168,7 +168,7 @@ function App() {
     setShowTrace(false); 
     
     try {
-      const response = await fetch("http://localhost:8000/api/process-alert", {
+      const response = await fetch("https://barclays-sar-app.onrender.com/api/process-alert", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(alertInput),

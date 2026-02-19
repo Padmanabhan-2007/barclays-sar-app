@@ -22,7 +22,9 @@ app.add_middleware(
 )
 
 # NOTE: Hardcoded for local testing. NEVER commit this API key to GitHub!
-client = genai.Client(api_key="AIzaSyDH37rEDdkNjfMO4m8d1la49nSOAdQZpiU")
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+
+
 
 class AlertData(BaseModel):
     alert_id: str
