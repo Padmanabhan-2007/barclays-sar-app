@@ -1,125 +1,560 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
-// --- NEW AUTHENTICATION SCREEN COMPONENT ---
-function AuthScreen({ onLogin }) {
-  const [isLogin, setIsLogin] = useState(true);
-  const [tier, setTier] = useState('premium');
+// ============================================================
+// DESIGN SYSTEM: Barclays SAR — "Obsidian Intelligence" Aesthetic
+// Near-black obsidian base | Icy blue accents | Crimson alerts
+// Font: Space Grotesk (headings) + Inter (body) + JetBrains Mono (data)
+// ============================================================
 
-const handleSubmit = (e) => {
-  e.preventDefault();
+const styles = `
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 
-  if (!isLogin) {
-    alert("Enterprise account provisioned! Please log in with your new credentials.");
-    setIsLogin(true);
-  } else {
-    onLogin();
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --obs:      #0C0D0F;
+    --obs-2:    #13151A;
+    --obs-3:    #1A1D24;
+    --obs-4:    #22262F;
+    --obs-5:    #2C3140;
+    --ice:      #A8D4F5;
+    --ice-bright:#C8E8FF;
+    --ice-dim:  #6AAAD4;
+    --ice-glow: #7EC8F0;
+    --red:      #E05555;
+    --red-dim:  #B03A3A;
+    --white:    #EDF2F7;
+    --muted:    #5A6478;
+    --muted2:   #7A8699;
+    --border:   rgba(168,212,245,0.10);
+    --border2:  rgba(255,255,255,0.05);
   }
+
+  body { background: var(--obs); color: var(--white); font-family: 'Inter', sans-serif; }
+
+  .mono   { font-family: 'JetBrains Mono', monospace; }
+  .grotesk{ font-family: 'Space Grotesk', sans-serif; }
+
+  /* Scrollbars */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: var(--obs-2); }
+  ::-webkit-scrollbar-thumb { background: var(--obs-5); border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--ice-dim); }
+
+  /* Noise texture */
+  .noise::before {
+    content: '';
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 0; border-radius: inherit;
+  }
+
+  /* Ice glowing line */
+  .glow-line {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--ice-glow), transparent);
+    opacity: 0.5;
+  }
+
+  /* Scanline */
+  .scanline {
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(168,212,245,0.012) 2px, rgba(168,212,245,0.012) 4px);
+    pointer-events: none;
+  }
+
+  /* Animations */
+  @keyframes ping    { 0%{transform:scale(1);opacity:0.8} 100%{transform:scale(2.4);opacity:0} }
+  @keyframes spin    { to { transform: rotate(360deg); } }
+  @keyframes fadeUp  { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes slideIn { from{opacity:0;transform:translateX(-10px)} to{opacity:1;transform:translateX(0)} }
+  @keyframes iceShimmer {
+    0%   { box-shadow: 0 0 6px rgba(168,212,245,0.15); }
+    50%  { box-shadow: 0 0 18px rgba(168,212,245,0.35); }
+    100% { box-shadow: 0 0 6px rgba(168,212,245,0.15); }
+  }
+
+  .fade-up  { animation: fadeUp 0.35s ease forwards; }
+  .slide-in { animation: slideIn 0.3s ease forwards; }
+
+  /* Inputs */
+  .sar-input {
+    width: 100%; background: var(--obs-3); border: 1px solid rgba(168,212,245,0.12);
+    border-radius: 5px; padding: 10px 14px; color: var(--white); font-size: 13px;
+    font-family: 'Inter', sans-serif; transition: border-color 0.2s, box-shadow 0.2s;
+    outline: none;
+  }
+  .sar-input:focus {
+    border-color: var(--ice-glow);
+    box-shadow: 0 0 0 3px rgba(168,212,245,0.08), 0 0 12px rgba(126,200,240,0.12);
+  }
+  .sar-input::placeholder { color: var(--muted); }
+  .sar-input option { background: var(--obs-3); }
+
+  /* Buttons */
+  .btn-primary {
+    background: var(--ice-glow); color: #080A0E; font-weight: 700;
+    font-size: 12px; letter-spacing: 0.07em; text-transform: uppercase;
+    border: none; border-radius: 5px; padding: 10px 20px;
+    cursor: pointer; transition: all 0.2s; font-family: 'Space Grotesk', sans-serif;
+  }
+  .btn-primary:hover {
+    background: var(--ice-bright);
+    box-shadow: 0 4px 24px rgba(168,212,245,0.30);
+    transform: translateY(-1px);
+  }
+  .btn-primary:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+
+  .btn-ghost {
+    background: transparent; color: var(--muted2); font-weight: 600;
+    font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
+    border: 1px solid rgba(168,212,245,0.14); border-radius: 5px; padding: 8px 14px;
+    cursor: pointer; transition: all 0.2s; font-family: 'Inter', sans-serif;
+  }
+  .btn-ghost:hover { color: var(--ice); border-color: rgba(168,212,245,0.35); }
+
+  /* Card */
+  .card {
+    background: var(--obs-2); border: 1px solid var(--border2);
+    border-radius: 10px; overflow: hidden;
+  }
+  .card-header {
+    padding: 13px 18px; border-bottom: 1px solid var(--border2);
+    background: rgba(255,255,255,0.018);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .card-header-label {
+    font-size: 10px; font-weight: 600; letter-spacing: 0.13em;
+    text-transform: uppercase; color: var(--muted2);
+    font-family: 'Space Grotesk', sans-serif;
+  }
+
+  /* Risk badge */
+  .risk-badge {
+    font-size: 9px; font-weight: 700; letter-spacing: 0.12em;
+    text-transform: uppercase; padding: 3px 8px; border-radius: 4px;
+    display: inline-flex; align-items: center; gap: 5px;
+    font-family: 'Space Grotesk', sans-serif;
+  }
+
+  /* Policy snippet */
+  .policy-snippet {
+    background: var(--obs); border-left: 2px solid var(--ice-glow);
+    padding: 10px 14px; border-radius: 0 5px 5px 0;
+    font-size: 11px; color: #6A8FAE; line-height: 1.75;
+    font-family: 'JetBrains Mono', monospace; margin-top: 8px;
+    animation: fadeUp 0.25s ease;
+  }
+
+  /* Narrative textarea */
+  .nar-textarea {
+    width: 100%; background: transparent; border: 1px solid transparent;
+    color: #8AA4BE; font-size: 13px; line-height: 1.8;
+    font-family: 'Inter', sans-serif; resize: vertical;
+    min-height: 80px; padding: 8px 12px; border-radius: 5px;
+    outline: none; transition: all 0.2s;
+  }
+  .nar-textarea:hover { border-color: rgba(168,212,245,0.14); background: rgba(255,255,255,0.018); }
+  .nar-textarea:focus { border-color: var(--ice-glow); background: rgba(168,212,245,0.03); }
+
+  /* Sidebar nav item */
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 12px; border-radius: 6px; font-size: 13px;
+    font-weight: 500; cursor: pointer; transition: all 0.15s;
+    color: var(--muted2); border: 1px solid transparent;
+    text-decoration: none; font-family: 'Inter', sans-serif;
+  }
+  .nav-item.active {
+    background: rgba(168,212,245,0.08); color: var(--ice);
+    border-color: rgba(168,212,245,0.18);
+    animation: iceShimmer 3s ease-in-out infinite;
+  }
+  .nav-item:hover:not(.active) { background: rgba(255,255,255,0.04); color: var(--white); }
+
+  /* Progress bar */
+  .progress-track { height: 2px; background: var(--obs-5); border-radius: 2px; overflow: hidden; }
+  .progress-fill  { height: 100%; border-radius: 2px; transition: width 1.1s ease; }
+
+  /* Toggle */
+  .toggle-wrap { display:flex; background:var(--obs-3); border-radius:6px; padding:3px; border:1px solid var(--border2); }
+  .toggle-btn {
+    flex:1; padding:8px 0; font-size:11px; font-weight:700; letter-spacing:0.08em;
+    text-transform:uppercase; border:none; border-radius:4px; cursor:pointer;
+    transition:all 0.2s; font-family:'Space Grotesk',sans-serif;
+  }
+  .toggle-btn.on  { background: var(--ice-glow); color: #080A0E; }
+  .toggle-btn.off { background:transparent; color:var(--muted2); }
+  .toggle-btn.off:hover { color: var(--white); }
+
+  /* Tx row */
+  .tx-row {
+    display:flex; align-items:center; gap:8px;
+    background:var(--obs-3); border:1px solid var(--border2);
+    border-radius:6px; padding:10px 12px; transition: border-color 0.2s;
+  }
+  .tx-row:hover { border-color: rgba(168,212,245,0.18); }
+  .tx-input {
+    background:var(--obs-2); border:1px solid rgba(168,212,245,0.10);
+    border-radius:4px; padding:6px 10px; color:var(--white);
+    font-size:12px; font-family:'Inter',sans-serif; outline:none;
+    transition: border-color 0.2s;
+  }
+  .tx-input:focus { border-color: var(--ice-glow); }
+  .tx-input::placeholder { color: var(--muted); }
+
+  /* Details/summary */
+  details > summary { list-style: none; }
+  details > summary::-webkit-details-marker { display: none; }
+
+  /* Auth dot grid */
+  .dot-grid {
+    background-image: radial-gradient(circle, rgba(168,212,245,0.14) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+
+  /* Pulse dot */
+  .pulse-dot::after {
+    content:''; position:absolute; inset:0; border-radius:50%;
+    background: inherit; animation: ping 1.6s ease-out infinite;
+  }
+`;
+
+// ============================================================
+// ICONS (inline SVG components)
+// ============================================================
+const Icon = ({ d, size = 16, stroke = 'currentColor', fill = 'none', sw = 1.75 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill={fill} stroke={stroke} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round">
+    {Array.isArray(d) ? d.map((p, i) => <path key={i} d={p} />) : <path d={d} />}
+  </svg>
+);
+
+const Icons = {
+  shield: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
+  alert: 'M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4M12 17h.01',
+  file: ['M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z', 'M14 2v6h6', 'M16 13H8', 'M16 17H8', 'M10 9H8'],
+  zap: 'M13 2L3 14h9l-1 8 10-12h-9l1-8z',
+  search: ['M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0'],
+  trash: ['M3 6h18', 'M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2'],
+  plus: 'M12 5v14M5 12h14',
+  logout: ['M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4', 'M16 17l5-5-5-5', 'M21 12H9'],
+  chevron: 'M9 18l6-6-6-6',
+  lock: ['M19 11H5a2 2 0 00-2 2v7a2 2 0 002 2h14a2 2 0 002-2v-7a2 2 0 00-2-2z', 'M7 11V7a5 5 0 0110 0v4'],
+  user: ['M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2', 'M12 3a4 4 0 100 8 4 4 0 000-8z'],
+  clock: ['M12 2a10 10 0 100 20A10 10 0 0012 2z', 'M12 6v6l4 2'],
+  eye: ['M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z', 'M12 9a3 3 0 100 6 3 3 0 000-6z'],
 };
 
+// ============================================================
+// AUTH SCREEN
+// ============================================================
+function AuthScreen({ onLogin }) {
+  const [isLogin, setIsLogin] = useState(true);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => { setTimeout(() => setMounted(true), 50); }, []);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!isLogin) { alert('Account provisioned. Please log in.'); setIsLogin(true); }
+    else { onLogin(); }
+  };
+
   return (
-    <div className="flex h-screen bg-slate-50 font-sans selection:bg-[#00AEEF] selection:text-white">
-      
-      {/* Left Panel - Branding & Value Prop */}
-      <div className="hidden lg:flex flex-col justify-between w-5/12 bg-[#002B4D] text-white p-12 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-[#00AEEF] opacity-10 rounded-bl-full blur-3xl"></div>
-        <div className="absolute bottom-0 left-0 w-96 h-96 bg-[#D03027] opacity-10 rounded-tr-full blur-3xl"></div>
+    <>
+      <style>{styles}</style>
+      <div style={{ display: 'flex', height: '100vh', background: 'var(--obs)', overflow: 'hidden' }}>
         
-        <div className="z-10">
-          <div className="font-bold text-3xl tracking-widest mb-2">BARCLAYS</div>
-          <div className="text-sm font-semibold tracking-wider text-[#00AEEF] uppercase mb-12">Global Compliance Engine</div>
+        {/* LEFT — Brand panel */}
+        <div style={{ width: '45%', background: 'var(--obs-2)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '48px', position: 'relative', overflow: 'hidden' }} className="noise dot-grid">
           
-          <h1 className="text-4xl font-light leading-tight mb-6">
-            Next-Generation <br/><span className="font-bold">Financial Crime Analysis</span>
-          </h1>
-          <p className="text-slate-300 text-sm leading-relaxed max-w-md">
-            Automate SAR generation, map complex transaction ledgers to the Barclays Financial Crime Policy, and dynamically detect multi-pillar violations in seconds.
-          </p>
+          {/* Glow orbs */}
+          <div style={{ position: 'absolute', top: '-80px', right: '-80px', width: 320, height: 320, background: 'radial-gradient(circle, rgba(212,168,67,0.12) 0%, transparent 70%)', pointerEvents: 'none' }} />
+          <div style={{ position: 'absolute', bottom: '-60px', left: '-60px', width: 280, height: 280, background: 'radial-gradient(circle, rgba(224,85,85,0.08) 0%, transparent 70%)', pointerEvents: 'none' }} />
+
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            {/* Logo */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 64 }}>
+              <div style={{ width: 36, height: 36, background: 'var(--ice-glow)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon d={Icons.shield} size={18} stroke="var(--obs)" sw={2.5} />
+              </div>
+              <div>
+                <div className="syne" style={{ fontSize: 16, fontWeight: 800, letterSpacing: '0.15em', color: 'var(--white)' }}>BARCLAYS</div>
+                <div style={{ fontSize: 9, letterSpacing: '0.2em', color: 'var(--ice-glow)', textTransform: 'uppercase', fontWeight: 600 }}>Compliance Engine</div>
+              </div>
+            </div>
+
+            <h1 style={{ fontSize: 40, fontWeight: 300, lineHeight: 1.2, color: 'var(--white)', marginBottom: 16 }}>
+              Next-Gen<br />
+              <span style={{ fontWeight: 700, background: 'linear-gradient(135deg, var(--ice-glow), #E8B84D)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                Financial Crime
+              </span><br />
+              Intelligence
+            </h1>
+            <p style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.8, maxWidth: 340 }}>
+              Automate SAR generation, map transaction ledgers to Barclays Financial Crime Policy, and detect multi-pillar violations in seconds.
+            </p>
+          </div>
+
+          {/* Stats */}
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            <div className="glow-line" style={{ marginBottom: 24 }} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20 }}>
+              {[['98.7%', 'Detection Rate'], ['< 2s', 'Analysis Time'], ['Multi-Pillar', 'Risk Mapping']].map(([val, label]) => (
+                <div key={label}>
+                  <div className="mono" style={{ fontSize: 18, fontWeight: 500, color: 'var(--ice-glow)', marginBottom: 4 }}>{val}</div>
+                  <div style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>{label}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ marginTop: 28, display: 'flex', gap: 10 }}>
+              {['AES-256 Encrypted', 'SOC 2 Type II', 'GDPR Compliant'].map(tag => (
+                <span key={tag} style={{ fontSize: 9, padding: '4px 8px', background: 'rgba(168,212,245,0.06)', border: '1px solid rgba(212,168,67,0.15)', borderRadius: 3, color: 'var(--muted)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{tag}</span>
+              ))}
+            </div>
+          </div>
         </div>
 
-        <div className="z-10 border-t border-white/10 pt-6">
-          <div className="text-[10px] uppercase tracking-widest text-slate-400 mb-3">Enterprise Security</div>
-          <div className="flex gap-4">
-            <span className="bg-white/10 px-3 py-1 rounded-sm text-xs border border-white/5">AES-256 Encryption</span>
-            <span className="bg-white/10 px-3 py-1 rounded-sm text-xs border border-white/5">SOC 2 Type II</span>
+        {/* RIGHT — Form */}
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 48, background: 'var(--obs)' }}>
+          <div style={{ width: '100%', maxWidth: 400, opacity: mounted ? 1 : 0, transform: mounted ? 'none' : 'translateY(20px)', transition: 'all 0.5s ease' }}>
+            
+            <div style={{ marginBottom: 36 }}>
+              <h2 style={{ fontSize: 26, fontWeight: 700, color: 'var(--white)', marginBottom: 8 }}>
+                {isLogin ? 'Secure Access' : 'Create Account'}
+              </h2>
+              <p style={{ fontSize: 13, color: 'var(--muted)' }}>
+                {isLogin ? 'Authenticate to access the SAR command centre.' : 'Provision your compliance workspace.'}
+              </p>
+            </div>
+
+            {/* Toggle */}
+            <div className="toggle-wrap" style={{ marginBottom: 28 }}>
+              <button className={`toggle-btn ${isLogin ? 'on' : 'off'}`} onClick={() => setIsLogin(true)}>Log In</button>
+              <button className={`toggle-btn ${!isLogin ? 'on' : 'off'}`} onClick={() => setIsLogin(false)}>Sign Up</button>
+            </div>
+
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {!isLogin && (
+                <>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 6 }}>Clearance Role</label>
+                    <select className="sar-input">
+                      <option>Analyst</option>
+                      <option>Investigator</option>
+                      <option>Compliance Head</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 6 }}>Full Name</label>
+                    <input required type="text" placeholder="Full name" className="sar-input" />
+                  </div>
+                </>
+              )}
+
+              <div>
+                <label style={{ display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 6 }}>Corporate Email</label>
+                <input required type="email" placeholder="name@barclays.com" className="sar-input" />
+              </div>
+
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <label style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--muted)' }}>Password</label>
+                  {isLogin && <a href="#" style={{ fontSize: 11, color: 'var(--ice-glow)', textDecoration: 'none' }}>Forgot?</a>}
+                </div>
+                <input required type="password" placeholder="••••••••••" className="sar-input" />
+              </div>
+
+              <button type="submit" className="btn-primary" style={{ marginTop: 8, padding: '13px 0', fontSize: 13 }}>
+                {isLogin ? '→ Authenticate' : '→ Create Workspace'}
+              </button>
+            </form>
+
+            <p style={{ fontSize: 10, color: '#3A5470', lineHeight: 1.8, textAlign: 'center', marginTop: 28 }}>
+              By accessing this system, you agree to the Barclays Financial Crime Policy. All activity is monitored for audit purposes.
+            </p>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ============================================================
+// SIDEBAR
+// ============================================================
+function Sidebar({ onLogout }) {
+  return (
+    <aside style={{ width: 220, background: 'var(--obs-2)', borderRight: '1px solid var(--border2)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+      
+      {/* Logo */}
+      <div style={{ padding: '20px 18px 16px', borderBottom: '1px solid var(--border2)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 30, height: 30, background: 'var(--ice-glow)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Icon d={Icons.shield} size={15} stroke="var(--obs)" sw={2.5} />
+          </div>
+          <div>
+            <div className="syne" style={{ fontSize: 13, fontWeight: 800, letterSpacing: '0.15em', color: 'var(--white)' }}>BARCLAYS</div>
+            <div style={{ fontSize: 8, letterSpacing: '0.16em', color: 'var(--ice-glow)', textTransform: 'uppercase', fontWeight: 600 }}>SAR Engine v2</div>
           </div>
         </div>
       </div>
 
-      {/* Right Panel - Login/Signup Form */}
-      <div className="flex-1 flex items-center justify-center p-8 relative">
-        <div className="max-w-md w-full">
-          
-          <div className="text-center mb-10">
-            <h2 className="text-2xl font-bold text-[#00395D] mb-2">
-              {isLogin ? 'Access Secure Workspace' : 'Create Compliance Account'}
-            </h2>
-            <p className="text-sm text-slate-500">
-              {isLogin ? 'Enter your credentials to access the SAR engine.' : 'Select your licensing tier to begin.'}
-            </p>
+      {/* Nav */}
+      <nav style={{ flex: 1, padding: '12px 10px' }}>
+        <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: '#2A4A6A', padding: '6px 8px', marginBottom: 4 }}>Modules</div>
+        {[
+          { icon: Icons.file, label: 'Active Investigations', active: true },
+          { icon: Icons.alert, label: 'Alert Queue' },
+          { icon: Icons.search, label: 'Entity Lookup' },
+          { icon: Icons.clock, label: 'Audit Trail' },
+        ].map(({ icon, label, active }) => (
+          <a key={label} href="#" className={`nav-item ${active ? 'active' : ''}`}>
+            <Icon d={icon} size={15} stroke="currentColor" sw={2} />
+            <span>{label}</span>
+          </a>
+        ))}
+      </nav>
+
+      {/* User + logout */}
+      <div style={{ padding: '12px 10px', borderTop: '1px solid var(--border2)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', marginBottom: 6 }}>
+          <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--obs-4)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Icon d={Icons.user} size={13} stroke="var(--muted)" sw={2} />
+          </div>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--white)' }}>Analyst</div>
+            <div style={{ fontSize: 10, color: 'var(--muted)' }}>name@barclays.com</div>
+          </div>
+        </div>
+        <button className="nav-item" onClick={onLogout} style={{ width: '100%', background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 12 }}>
+          <Icon d={Icons.logout} size={14} stroke="currentColor" sw={2} />
+          Sign Out
+        </button>
+      </div>
+    </aside>
+  );
+}
+
+// ============================================================
+// RISK BADGE
+// ============================================================
+function RiskBadge({ rating }) {
+  const isCritical = rating.includes('CRITICAL');
+  const isHigh = rating.includes('HIGH');
+  const color = isCritical ? 'var(--red)' : isHigh ? '#F59E0B' : '#22C55E';
+  const bg = isCritical ? 'rgba(224,85,85,0.1)' : isHigh ? 'rgba(245,158,11,0.1)' : 'rgba(34,197,94,0.1)';
+  return (
+    <span className="risk-badge" style={{ background: bg, border: `1px solid ${color}30`, color }}>
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: color, position: 'relative', flexShrink: 0 }} className="pulse-dot" />
+      {rating}
+    </span>
+  );
+}
+
+// ============================================================
+// LOADING OVERLAY
+// ============================================================
+function LoadingState() {
+  const [dots, setDots] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setDots(d => (d + 1) % 4), 400);
+    return () => clearInterval(t);
+  }, []);
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20 }}>
+      <div style={{ width: 48, height: 48, border: '2px solid var(--obs-4)', borderTop: "2px solid var(--ice-glow)", borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+      <div>
+        <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ice-glow)', textAlign: 'center', marginBottom: 6 }}>
+          Running Multi-Pillar AI Models{'.'.repeat(dots)}
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center' }}>Mapping transactions to Barclays Financial Crime Policy</div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// SECTION HEADER
+// ============================================================
+function SectionHeader({ label, children }) {
+  return (
+    <div className="card-header">
+      <span className="card-header-label">{label}</span>
+      {children}
+    </div>
+  );
+}
+
+// ============================================================
+// CASE INTAKE FORM
+// ============================================================
+function CaseIntakeForm({ alertInput, onInputChange, onTxChange, onAddTx, onRemoveTx }) {
+  return (
+    <div className="card fade-up" style={{ flex: 1 }}>
+      <SectionHeader label="Case Intake">
+        <span style={{ fontSize: 10, color: 'var(--muted)' }}>Configure alert & build transaction ledger</span>
+      </SectionHeader>
+      <div style={{ padding: 24 }}>
+        
+        {/* Grid: Name + Alert ID */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+          <div>
+            <label style={{ display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 6 }}>Subject Name</label>
+            <input type="text" name="customer_name" value={alertInput.customer_name} onChange={onInputChange} className="sar-input" />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 6 }}>Alert ID</label>
+            <input type="text" name="alert_id" value={alertInput.alert_id} onChange={onInputChange} className="sar-input mono" />
+          </div>
+        </div>
+
+        {/* Risk Rating */}
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 6 }}>Risk Rating</label>
+          <select name="risk_rating" value={alertInput.risk_rating} onChange={onInputChange} className="sar-input">
+            <option value="LOW RISK">Low Risk</option>
+            <option value="MEDIUM RISK">Medium Risk</option>
+            <option value="HIGH RISK">High Risk</option>
+            <option value="CRITICAL RISK">Critical Risk</option>
+          </select>
+        </div>
+
+        {/* Trigger Event */}
+        <div style={{ marginBottom: 28 }}>
+          <label style={{ display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 6 }}>Trigger Event Summary</label>
+          <textarea name="trigger_event" value={alertInput.trigger_event} onChange={onInputChange} className="sar-input" style={{ resize: 'none', height: 72 }} />
+        </div>
+
+        {/* Transaction Builder */}
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <label style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--muted)' }}>Transaction Ledger</label>
+            <button onClick={onAddTx} className="btn-ghost" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <Icon d={Icons.plus} size={12} stroke="currentColor" sw={2.5} />
+              Add Row
+            </button>
           </div>
 
-          {/* Toggle Login / Sign Up */}
-          <div className="flex bg-slate-100 p-1 rounded-sm mb-8 border border-slate-200">
-            <button 
-              onClick={() => setIsLogin(true)} 
-              className={`flex-1 text-xs font-bold py-2.5 uppercase tracking-wide rounded-sm transition-all ${isLogin ? 'bg-white text-[#00395D] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-              Log In
-            </button>
-            <button 
-              onClick={() => setIsLogin(false)} 
-              className={`flex-1 text-xs font-bold py-2.5 uppercase tracking-wide rounded-sm transition-all ${!isLogin ? 'bg-white text-[#00395D] shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-              Sign Up
-            </button>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            
-           {/* Clearance Role Selector (RBAC) */}
-{!isLogin && (
-  <div className="mb-6">
-    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
-      Clearance Role
-    </label>
-    <select className="w-full border border-slate-300 rounded-sm px-4 py-2.5 text-sm focus:outline-none focus:border-[#00AEEF] focus:ring-1 focus:ring-[#00AEEF] bg-white">
-      <option>Analyst</option>
-      <option>Investigator</option>
-      <option>Compliance Head</option>
-    </select>
-  </div>
-)}
-
-
-            {/* Inputs */}
-            {!isLogin && (
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Full Name</label>
-                <input required type="text" placeholder="Analyst Name" className="w-full border border-slate-300 rounded-sm px-4 py-2.5 text-sm focus:outline-none focus:border-[#00AEEF] focus:ring-1 focus:ring-[#00AEEF]" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {alertInput.transactions.map((tx, index) => (
+              <div key={index} className="tx-row">
+                <input type="date" value={tx.date} onChange={e => onTxChange(index, 'date', e.target.value)} className="tx-input" style={{ width: 130 }} />
+                <input type="text" placeholder="Type (e.g. Wire)" value={tx.type} onChange={e => onTxChange(index, 'type', e.target.value)} className="tx-input" style={{ width: '20%' }} />
+                <input type="text" placeholder="Destination / Origin" value={tx.destination_origin} onChange={e => onTxChange(index, 'destination_origin', e.target.value)} className="tx-input" style={{ flex: 1 }} />
+                <div style={{ position: 'relative' }}>
+                  <span style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', fontSize: 12 }}>$</span>
+                  <input type="number" placeholder="0" value={tx.amount} onChange={e => onTxChange(index, 'amount', e.target.value)} className="tx-input mono" style={{ width: 110, paddingLeft: 20, textAlign: 'right' }} />
+                </div>
+                <button onClick={() => onRemoveTx(index)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: '2px 4px', borderRadius: 3, transition: 'color 0.15s' }} onMouseEnter={e => e.target.style.color = 'var(--red)'} onMouseLeave={e => e.target.style.color = 'var(--muted)'}>
+                  <Icon d={Icons.trash} size={14} stroke="currentColor" sw={2} />
+                </button>
+              </div>
+            ))}
+            {alertInput.transactions.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '28px 0', border: '1px dashed var(--border)', borderRadius: 6, color: 'var(--muted)', fontSize: 12 }}>
+                No transactions added yet. Click "Add Row" to build the ledger.
               </div>
             )}
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Corporate Email</label>
-              <input required type="email" placeholder="name@barclays.com" className="w-full border border-slate-300 rounded-sm px-4 py-2.5 text-sm focus:outline-none focus:border-[#00AEEF] focus:ring-1 focus:ring-[#00AEEF]" />
-            </div>
-            <div>
-              <div className="flex justify-between items-center mb-1">
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Password</label>
-                {isLogin && <a href="#" className="text-[10px] text-[#00AEEF] hover:underline">Forgot?</a>}
-              </div>
-              <input required type="password" placeholder="••••••••" className="w-full border border-slate-300 rounded-sm px-4 py-2.5 text-sm focus:outline-none focus:border-[#00AEEF] focus:ring-1 focus:ring-[#00AEEF]" />
-            </div>
-
-            <button type="submit" className="w-full bg-[#00395D] hover:bg-[#002B4D] text-white font-bold text-sm py-3 rounded-sm transition-colors mt-4 shadow-sm">
-              {isLogin ? 'SECURE LOGIN' : 'CREATE ACCOUNT'}
-            </button>
-          </form>
-
-          {/* Compliance Disclaimer */}
-          <div className="mt-8 pt-6 border-t border-slate-200 text-center">
-            <p className="text-[9px] text-slate-400 leading-relaxed max-w-xs mx-auto">
-              By accessing this system, you agree to the Barclays Financial Crime Policy and acknowledge that all activity is monitored for security and audit purposes.
-            </p>
           </div>
         </div>
       </div>
@@ -127,21 +562,204 @@ const handleSubmit = (e) => {
   );
 }
 
+// ============================================================
+// RISK BREAKDOWN CARD
+// ============================================================
+function RiskBreakdown({ riskBreakdown }) {
+  const [active, setActive] = useState(null);
+  const explanations = {
+    "OFAC/OFSI Sanctions List Match": "Beneficiary strictly matches HM Treasury (OFSI) and US Treasury (OFAC) consolidated watchlists.",
+    "Politically Exposed Person (PEP) Connection": "Recipient identified as a Foreign Public Official, triggering Anti-Bribery & Corruption protocols.",
+    "High-Risk Third Country (AML)": "Funds routed through non-cooperative jurisdictions matching FATF/UK watchlists.",
+    "Opaque Offshore Trust Routing (ATEF)": "Complex offshore corporate structures indicative of deliberate tax evasion facilitation."
+  };
 
-// --- MAIN APP COMPONENT ---
+  return (
+    <div className="card fade-up" style={{ borderLeft: '3px solid var(--red)' }}>
+      <SectionHeader label="Multi-Pillar Risk Breakdown" />
+      <div style={{ padding: '16px 18px' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 6 }}>
+          <span style={{ fontSize: 44, fontWeight: 700, color: 'var(--red)', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>98%</span>
+          <span style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Total Risk Score</span>
+        </div>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          <span style={{ fontSize: 9, padding: '3px 8px', background: 'rgba(224,85,85,0.1)', border: '1px solid rgba(224,85,85,0.2)', borderRadius: 3, color: 'var(--red)', letterSpacing: '0.1em', textTransform: 'uppercase', fontWeight: 700 }}>CRITICAL</span>
+          <span style={{ fontSize: 9, padding: '3px 8px', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border2)', borderRadius: 3, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>THRESHOLD: 75%</span>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {riskBreakdown?.map((risk, idx) => (
+            <div key={idx} onClick={() => setActive(active === idx ? null : idx)} style={{ padding: '8px 10px', borderRadius: 5, cursor: 'pointer', background: active === idx ? 'rgba(212,168,67,0.05)' : 'transparent', border: `1px solid ${active === idx ? 'rgba(212,168,67,0.15)' : 'transparent'}`, transition: 'all 0.15s' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: active === idx ? 8 : 0 }}>
+                <span style={{ fontSize: 12, color: 'var(--white)', borderBottom: '1px dashed rgba(110,140,170,0.4)', paddingBottom: 1 }}>{risk.factor}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--red)' }}>+{risk.contribution_percentage}%</span>
+              </div>
+              {active === idx && (
+                <div style={{ fontSize: 11, color: '#7A9AB8', lineHeight: 1.7, borderLeft: '2px solid var(--ice-glow)', paddingLeft: 10, animation: 'fadeUp 0.2s ease' }}>
+                  {explanations[risk.factor] || 'Pattern identified via behavioral baseline deviation.'}
+                </div>
+              )}
+              {/* Progress bar */}
+              <div className="progress-track" style={{ marginTop: active === idx ? 8 : 4 }}>
+                <div className="progress-fill" style={{ width: `${risk.contribution_percentage}%`, background: 'linear-gradient(90deg, var(--red-dim), var(--red))' }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// RECOMMENDATION CARD
+// ============================================================
+function RecommendationCard({ recommendation }) {
+  return (
+    <div className="card fade-up" style={{ background: 'linear-gradient(135deg, #08101C 0%, #0E1A28 100%)', border: '1px solid rgba(224,85,85,0.25)', position: 'relative', overflow: 'hidden' }}>
+      <div style={{ position: 'absolute', top: 0, right: 0, width: 120, height: 120, background: 'radial-gradient(circle, rgba(224,85,85,0.15) 0%, transparent 70%)', pointerEvents: 'none' }} />
+      <SectionHeader label="System Recommendation">
+        <Icon d={Icons.alert} size={14} stroke="var(--red)" sw={2} />
+      </SectionHeader>
+      <div style={{ padding: '20px 18px', position: 'relative', zIndex: 1 }}>
+        <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--white)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 14 }}>
+          {recommendation?.action}
+        </div>
+        <p style={{ fontSize: 12, color: '#A8C8E0', lineHeight: 1.75, borderLeft: '2px solid var(--red)', paddingLeft: 12 }}>
+          {recommendation?.reasoning}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// SAR NARRATIVE WORKSPACE
+// ============================================================
+function NarrativeWorkspace({ narrative }) {
+  const [showTrace, setShowTrace] = useState(false);
+  const sections = [
+    { key: 'background', label: 'Background' },
+    { key: 'timeline', label: 'Transaction Timeline' },
+    { key: 'indicators', label: 'Suspicion Indicators' },
+    { key: 'conclusion', label: 'Conclusion' },
+  ];
+
+  return (
+    <div className="card fade-up" style={{ flex: 1 }}>
+      <div className="card-header" style={{ background: 'linear-gradient(90deg, var(--obs-3), var(--obs-2))', borderBottom: '1px solid var(--border)' }}>
+        <span className="card-header-label" style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--white)' }}>
+          <Icon d={Icons.zap} size={14} stroke="var(--ice-glow)" sw={2} />
+          Structured SAR Narrative
+        </span>
+        <span style={{ fontSize: 10, color: 'var(--muted)' }}>AI-generated · Editable</span>
+      </div>
+      <div style={{ padding: '8px 0' }}>
+        {sections.map((sec, i) => (
+          <details key={sec.key} open style={{ borderBottom: '1px solid var(--border2)' }}>
+            <summary style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 18px', cursor: 'pointer', userSelect: 'none' }}>
+              <span style={{ fontSize: 10, color: 'var(--ice-glow)', fontWeight: 700 }}>0{i + 1}</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--white)', flex: 1 }}>{sec.label}</span>
+              {sec.key === 'indicators' && (
+                <button onClick={e => { e.preventDefault(); setShowTrace(!showTrace); }} style={{ fontSize: 10, padding: '3px 10px', background: showTrace ? 'rgba(168,212,245,0.08)' : 'transparent', border: '1px solid rgba(168,212,245,0.16)', borderRadius: 3, color: 'var(--ice-glow)', cursor: 'pointer', fontFamily: 'Inter, sans-serif', transition: 'all 0.15s' }}>
+                  {showTrace ? 'Hide' : 'Show'} Trace Evidence
+                </button>
+              )}
+            </summary>
+            <div style={{ padding: '0 18px 12px' }}>
+              <textarea className="nar-textarea" defaultValue={narrative?.[sec.key]} style={{ width: '100%' }} />
+              {sec.key === 'indicators' && showTrace && (
+                <div style={{ marginTop: 12, background: 'var(--obs-3)', border: '1px solid rgba(212,168,67,0.15)', borderRadius: 6, padding: 16, animation: 'fadeUp 0.3s ease' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ice-glow)', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Icon d={Icons.search} size={12} stroke="var(--ice-glow)" sw={2} />
+                    AI Traceability Evidence
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                    {[
+                      { title: 'Supporting Transactions', content: <><div className="mono" style={{ color: 'var(--red)', fontSize: 12, fontWeight: 600 }}>TX-9982-B & TX-9983-C</div><div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>Targeted entities identified.</div></> },
+                      { title: 'Risk Drivers', content: [['Sanctions Match', '40%'], ['PEP (ABC)', '25%'], ['Offshore (ATEF)', '15%']].map(([l, v]) => (<div key={l} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4 }}><span style={{ color: 'var(--muted)' }}>{l}</span><span style={{ color: 'var(--red)', fontWeight: 700 }}>{v}</span></div>)) },
+                      { title: 'Policy Reference', content: <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.7 }}>UK Bribery Act (PEP), UK Criminal Finances Act (ATEF), and OFAC Sanctions — immediate escalation required.</div> }
+                    ].map(block => (
+                      <div key={block.title} style={{ background: 'var(--obs-2)', border: '1px solid var(--border2)', borderRadius: 5, padding: 12 }}>
+                        <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 8 }}>{block.title}</div>
+                        {block.content}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </details>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// POLICY MAPPING CARD
+// ============================================================
+function PolicyMapping({ findings }) {
+  const [activeSnippet, setActiveSnippet] = useState(null);
+  return (
+    <div className="card fade-up">
+      <SectionHeader label="Global Policy Mapping" />
+      <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {findings?.map((finding, idx) => (
+          <div key={idx} style={{ background: 'var(--obs-3)', border: '1px solid var(--border2)', borderRadius: 6, padding: 14, transition: 'border-color 0.2s' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--red)', flexShrink: 0 }} />
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--white)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{finding.rule}</span>
+            </div>
+            <p style={{ fontSize: 12, color: 'var(--muted)', paddingLeft: 14, marginBottom: 10, lineHeight: 1.6 }}>{finding.detail}</p>
+            <div style={{ paddingLeft: 14 }}>
+              <button onClick={() => setActiveSnippet(activeSnippet === idx ? null : idx)} style={{ fontSize: 10, padding: '4px 10px', background: 'rgba(168,212,245,0.06)', border: '1px solid rgba(168,212,245,0.16)', borderRadius: 3, color: 'var(--ice-glow)', cursor: 'pointer', fontFamily: 'JetBrains Mono, monospace', transition: 'all 0.15s', letterSpacing: '0.04em' }}>
+                ↳ {finding.policy}
+              </button>
+            </div>
+            {activeSnippet === idx && (
+              <div className="policy-snippet">{finding.policy_snippet}</div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// AUDIT TIMELINE CARD
+// ============================================================
+function AuditTimeline({ logs }) {
+  return (
+    <div className="card fade-up">
+      <SectionHeader label="Investigation Timeline">
+        <Icon d={Icons.clock} size={14} stroke="var(--muted)" sw={2} />
+      </SectionHeader>
+      <div style={{ padding: '20px 18px', overflowY: 'auto', maxHeight: 300 }}>
+        <div style={{ position: 'relative', borderLeft: '1px solid var(--border)', paddingLeft: 20 }}>
+          {logs?.map((log, idx) => (
+            <div key={idx} style={{ marginBottom: 20, position: 'relative', animation: `fadeUp 0.4s ${idx * 0.08}s ease both` }}>
+              <div style={{ position: 'absolute', left: -24, top: 2, width: 8, height: 8, borderRadius: '50%', background: 'var(--ice-glow)', boxShadow: '0 0 8px rgba(212,168,67,0.5)' }} />
+              <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 3 }}>{new Date(log.timestamp).toLocaleTimeString()}</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--white)', marginBottom: 3 }}>{log.action}</div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.6 }}>{log.details}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// MAIN APP
+// ============================================================
 function App() {
-  // NEW: Authentication state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-
   const [loading, setLoading] = useState(false);
   const [reportData, setReportData] = useState(null);
-  const [caseStatus, setCaseStatus] = useState('OPEN');
-  
-  const [activePolicySnippet, setActivePolicySnippet] = useState(null);
-  const [activeRiskFactor, setActiveRiskFactor] = useState(null);
-  const [showTrace, setShowTrace] = useState(false);
 
-  // DYNAMIC STATE
   const [alertInput, setAlertInput] = useState({
     alert_id: "ALT-2026-9042",
     customer_name: "Mr. John Doe",
@@ -153,27 +771,14 @@ function App() {
     ]
   });
 
-  const getRiskExplanation = (factor) => {
-    const explanations = {
-      "OFAC/OFSI Sanctions List Match": "Beneficiary name and/or address strictly matches entries on HM Treasury (OFSI) and US Treasury (OFAC) consolidated watchlists.",
-      "Politically Exposed Person (PEP) Connection": "Recipient identified as a Foreign Public Official or a closely connected individual, triggering Anti-Bribery & Corruption (ABC) protocols.",
-      "High-Risk Third Country (AML)": "Funds routed through historically non-cooperative jurisdictions matching FATF/UK watchlists.",
-      "Opaque Offshore Trust Routing (ATEF)": "Use of complex offshore corporate structures indicative of deliberate tax evasion facilitation."
-    };
-    return explanations[factor] || "Pattern identified via behavioral baseline deviation.";
-  };
-
   const processAlert = async () => {
     setLoading(true);
-    setShowTrace(false); 
-    
     try {
       const response = await fetch("https://barclays-sar-app.onrender.com/api/process-alert", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(alertInput),
       });
-      
       const data = await response.json();
       setReportData(data);
     } catch (error) {
@@ -183,13 +788,11 @@ function App() {
     setLoading(false);
   };
 
-  // Main Form Handlers
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setAlertInput(prev => ({ ...prev, [name]: value }));
   };
 
-  // Dynamic Transaction Row Handlers
   const handleTxChange = (index, field, value) => {
     const newTx = [...alertInput.transactions];
     newTx[index][field] = field === 'amount' ? Number(value) : value;
@@ -199,10 +802,7 @@ function App() {
   const addTransaction = () => {
     setAlertInput({
       ...alertInput,
-      transactions: [
-        ...alertInput.transactions, 
-        { date: "2026-02-14", type: "", amount: 0, destination_origin: "", tx_id: `TX-${Math.floor(1000 + Math.random() * 9000)}-X` }
-      ]
+      transactions: [...alertInput.transactions, { date: "2026-02-14", type: "", amount: 0, destination_origin: "", tx_id: `TX-${Math.floor(1000 + Math.random() * 9000)}-X` }]
     });
   };
 
@@ -212,459 +812,137 @@ function App() {
     setAlertInput({ ...alertInput, transactions: newTx });
   };
 
-  // NEW: If not authenticated, show the login screen!
   if (!isAuthenticated) {
     return <AuthScreen onLogin={() => setIsAuthenticated(true)} />;
   }
 
-  // If they ARE authenticated, return the normal dashboard
+  const totalAmount = alertInput.transactions.reduce((s, tx) => s + Number(tx.amount), 0);
+
   return (
-    <div className="flex h-screen bg-[#F9FAFB] text-slate-800 font-sans overflow-hidden selection:bg-[#00AEEF] selection:text-white">
-      
-      {/* ENTERPRISE SIDEBAR */}
-      <aside className="w-64 bg-[#00395D] text-slate-300 flex flex-col border-r border-[#002B4D] z-20">
-        <div className="p-5 border-b border-white/10 bg-[#002B4D]">
-          <div className="font-bold text-xl tracking-widest text-white mb-1">BARCLAYS</div>
-          <div className="text-xs font-semibold tracking-wider text-[#00AEEF] uppercase">Global Compliance</div>
-        </div>
-        <div className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-2">Modules</div>
-        <nav className="flex-1 px-2 space-y-1">
-          <a href="#" className="flex items-center gap-3 px-3 py-2 bg-[#00AEEF]/10 text-[#00AEEF] rounded-sm border-l-2 border-[#00AEEF] text-sm font-medium">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-            Active Investigations
-          </a>
-        </nav>
-      </aside>
-
-      {/* MAIN WORKSPACE */}
-      <main className="flex-1 flex flex-col h-full overflow-hidden">
+    <>
+      <style>{styles}</style>
+      <div style={{ display: 'flex', height: '100vh', background: 'var(--obs)', overflow: 'hidden', fontFamily: 'Inter, sans-serif' }}>
         
-        {/* Top Control Bar */}
-        <header className="bg-[#FFFFFF] px-6 py-4 border-b border-slate-200 flex justify-between items-center shrink-0 z-10 shadow-sm">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-sm border border-slate-200">CASE REF</span>
-              <h1 className="text-xl font-bold text-[#00395D] font-mono">{alertInput.alert_id}</h1>
-              {caseStatus !== 'OPEN' && (
-                <span className={`ml-2 text-[10px] font-bold px-2 py-0.5 rounded-sm uppercase tracking-wider text-white ${caseStatus === 'ESCALATED' ? 'bg-orange-500' : caseStatus === 'CLOSED' ? 'bg-slate-500' : 'bg-emerald-500'}`}>
-                  {caseStatus}
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-slate-500 uppercase tracking-wide">Multi-Pillar Automated Alert Review</p>
-          </div>
+        <Sidebar onLogout={() => setIsAuthenticated(false)} />
+
+        {/* MAIN */}
+        <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           
-          <div className="flex gap-2 items-center bg-slate-50 p-1 rounded-sm border border-slate-200">
-            {reportData && (
-              <button onClick={() => setReportData(null)} className="px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-white hover:text-[#00AEEF] rounded-sm transition-colors border border-transparent hover:border-slate-300">
-                ← Back to Input Form
+          {/* TOP BAR */}
+          <header style={{ background: 'var(--obs-2)', borderBottom: '1px solid var(--border2)', padding: '14px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 3 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', background: 'rgba(212,168,67,0.08)', border: '1px solid rgba(168,212,245,0.16)', borderRadius: 3, color: 'var(--ice-glow)', letterSpacing: '0.1em' }}>CASE REF</span>
+                <h1 className="mono" style={{ fontSize: 20, fontWeight: 600, color: 'var(--white)' }}>{alertInput.alert_id}</h1>
+                <RiskBadge rating={alertInput.risk_rating} />
+              </div>
+              <p style={{ fontSize: 11, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Multi-Pillar Automated Alert Review</p>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              {reportData && (
+                <button onClick={() => setReportData(null)} className="btn-ghost">
+                  ← Back to Intake
+                </button>
+              )}
+              <button onClick={processAlert} disabled={loading || alertInput.transactions.length === 0} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 22px' }}>
+                <Icon d={Icons.zap} size={14} stroke="var(--obs)" sw={2.5} fill="none" />
+                {loading ? 'Executing...' : 'Run AI SAR'}
               </button>
-            )}
-            <div className="w-px h-6 bg-slate-300 mx-1"></div>
-            <button 
-              onClick={processAlert} 
-              disabled={loading || alertInput.transactions.length === 0}
-              className={`px-4 py-1.5 rounded-sm font-bold text-white text-xs transition-all flex items-center gap-2 shadow-sm ${loading ? 'bg-[#00395D]/70 cursor-wait' : 'bg-[#00395D] hover:bg-[#002B4D]'}`}
-            >
-              {loading ? 'EXECUTING...' : 'RUN AI SAR'}
-            </button>
-            <button 
-              onClick={() => setIsAuthenticated(false)} 
-              className="ml-2 px-3 py-1.5 text-xs font-bold text-slate-500 hover:text-red-600 transition-colors"
-            >
-              Log Out
-            </button>
-          </div>
-        </header>
-
-        {/* Scrollable Content Area */}
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-[1600px] mx-auto">
-            
-            {/* LEFT COLUMN - Entity Profile & Ledger */}
-            <div className="lg:col-span-4 flex flex-col gap-6">
-              <div className="bg-[#FFFFFF] border border-slate-200 rounded-sm shadow-sm">
-                <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                  <h2 className="text-xs font-bold text-slate-700 uppercase tracking-widest">Entity Profile</h2>
-                  <span className={`${alertInput.risk_rating.includes('CRITICAL') || alertInput.risk_rating.includes('HIGH') ? 'bg-[#D03027]' : 'bg-orange-500'} text-white text-[10px] font-bold px-2 py-0.5 rounded-sm uppercase tracking-wider flex items-center gap-1.5`}>
-                    <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></span> {alertInput.risk_rating}
-                  </span>
-                </div>
-                <div className="p-4 flex flex-col gap-4">
-                  <div>
-                    <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Subject Name</div>
-                    <div className="text-base font-medium text-slate-900">{alertInput.customer_name}</div>
-                  </div>
-                  <div>
-                    <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">Trigger Event</div>
-                    <div className="text-xs font-medium text-slate-700 leading-relaxed">{alertInput.trigger_event}</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-[#FFFFFF] border border-slate-200 rounded-sm shadow-sm flex-1">
-                <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
-                  <h2 className="text-xs font-bold text-slate-700 uppercase tracking-widest">Transaction Ledger</h2>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-left">
-                    <thead className="text-[10px] text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-100">
-                      <tr><th className="px-4 py-2 font-bold">Details</th><th className="px-4 py-2 font-bold text-right">Amount</th></tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {alertInput.transactions.map((tx, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                          <td className="px-4 py-3">
-                            <div className="font-medium text-slate-800 text-xs">{tx.type || 'New Tx'}</div>
-                            <div className="text-[11px] text-slate-500 mt-0.5">{tx.destination_origin || '---'}</div>
-                            <div className="text-[9px] font-mono text-slate-400 mt-0.5">{tx.tx_id}</div>
-                          </td>
-                          <td className="px-4 py-3 font-mono text-sm font-semibold text-slate-900 text-right align-top">
-                            ${Number(tx.amount).toLocaleString()}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
             </div>
+          </header>
 
-            {/* RIGHT COLUMN - Analysis or Intake Form */}
-            <div className="lg:col-span-8 flex flex-col gap-6">
+          {/* CONTENT */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 20, maxWidth: 1600, margin: '0 auto' }}>
               
-              {/* THE NEW DYNAMIC CASE INTAKE FORM */}
-              {!reportData && !loading && (
-                <div className="flex-1 bg-white border border-slate-200 rounded-sm shadow-sm p-8">
-                  <div className="border-b border-slate-200 pb-4 mb-6">
-                    <h2 className="text-lg font-bold text-[#00395D] flex items-center gap-2">
-                      <svg className="w-5 h-5 text-[#00AEEF]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-                      Manual Case Intake
-                    </h2>
-                    <p className="text-xs text-slate-500 mt-1">Configure the alert details and build the transaction ledger to run the AI engine.</p>
-                  </div>
-
-                  {/* Basic Details */}
-                  <div className="grid grid-cols-2 gap-6 mb-6">
+              {/* LEFT COLUMN */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                
+                {/* Entity Profile */}
+                <div className="card">
+                  <SectionHeader label="Entity Profile">
+                    <RiskBadge rating={alertInput.risk_rating} />
+                  </SectionHeader>
+                  <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Subject Name</label>
-                      <input type="text" name="customer_name" value={alertInput.customer_name} onChange={handleInputChange} className="w-full border border-slate-300 rounded-sm px-3 py-2 text-sm focus:outline-none focus:border-[#00AEEF] focus:ring-1 focus:ring-[#00AEEF]" />
+                      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 5 }}>Subject</div>
+                      <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--white)' }}>{alertInput.customer_name}</div>
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Alert ID</label>
-                      <input type="text" name="alert_id" value={alertInput.alert_id} onChange={handleInputChange} className="w-full border border-slate-300 rounded-sm px-3 py-2 text-sm focus:outline-none focus:border-[#00AEEF] focus:ring-1 focus:ring-[#00AEEF] font-mono" />
-                    </div>
-                  </div>
-
-                  <div className="mb-6">
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Risk Rating</label>
-                    <select name="risk_rating" value={alertInput.risk_rating} onChange={handleInputChange} className="w-full border border-slate-300 rounded-sm px-3 py-2 text-sm focus:outline-none focus:border-[#00AEEF] focus:ring-1 focus:ring-[#00AEEF] bg-white">
-                      <option value="LOW RISK">Low Risk</option>
-                      <option value="MEDIUM RISK">Medium Risk</option>
-                      <option value="HIGH RISK">High Risk</option>
-                      <option value="CRITICAL RISK">Critical Risk</option>
-                    </select>
-                  </div>
-
-                  <div className="mb-8">
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Trigger Event Summary</label>
-                    <textarea name="trigger_event" value={alertInput.trigger_event} onChange={handleInputChange} className="w-full border border-slate-300 rounded-sm px-3 py-2 text-sm focus:outline-none focus:border-[#00AEEF] focus:ring-1 focus:ring-[#00AEEF] h-16 resize-none"></textarea>
-                  </div>
-
-                  {/* DYNAMIC TRANSACTION BUILDER */}
-                  <div>
-                    <div className="flex justify-between items-center border-b border-slate-200 pb-2 mb-4">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Transaction Ledger Builder</label>
-                      <button onClick={addTransaction} className="text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-[#00395D] px-2 py-1 rounded-sm flex items-center gap-1 transition-colors">
-                        <span>+</span> Add Row
-                      </button>
-                    </div>
-                    
-                    <div className="space-y-3">
-                      {alertInput.transactions.map((tx, index) => (
-                        <div key={index} className="flex items-center gap-3 bg-slate-50 p-3 rounded-sm border border-slate-200 relative group">
-                          <input 
-                            type="date" 
-                            value={tx.date} 
-                            onChange={(e) => handleTxChange(index, 'date', e.target.value)}
-                            className="w-32 text-xs border border-slate-300 rounded-sm px-2 py-1.5 focus:outline-none focus:border-[#00AEEF]" 
-                          />
-                          <input 
-                            type="text" 
-                            placeholder="Type (e.g. Wire)" 
-                            value={tx.type} 
-                            onChange={(e) => handleTxChange(index, 'type', e.target.value)}
-                            className="w-1/4 text-xs border border-slate-300 rounded-sm px-2 py-1.5 focus:outline-none focus:border-[#00AEEF]" 
-                          />
-                          <input 
-                            type="text" 
-                            placeholder="Destination / Origin" 
-                            value={tx.destination_origin} 
-                            onChange={(e) => handleTxChange(index, 'destination_origin', e.target.value)}
-                            className="flex-1 text-xs border border-slate-300 rounded-sm px-2 py-1.5 focus:outline-none focus:border-[#00AEEF]" 
-                          />
-                          <div className="relative">
-                            <span className="absolute left-2 top-1.5 text-xs text-slate-400">$</span>
-                            <input 
-                              type="number" 
-                              placeholder="Amount" 
-                              value={tx.amount} 
-                              onChange={(e) => handleTxChange(index, 'amount', e.target.value)}
-                              className="w-28 text-xs border border-slate-300 rounded-sm pl-5 pr-2 py-1.5 focus:outline-none focus:border-[#00AEEF] text-right font-mono" 
-                            />
-                          </div>
-                          <button 
-                            onClick={() => removeTransaction(index)}
-                            className="text-red-400 hover:text-red-600 transition-colors opacity-50 group-hover:opacity-100 px-1"
-                            title="Remove Transaction"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                          </button>
-                        </div>
-                      ))}
-                      {alertInput.transactions.length === 0 && (
-                        <div className="text-center p-6 text-xs text-slate-400 border-2 border-dashed border-slate-200 rounded-sm">
-                          No transactions added. Click "+ Add Row" to build the ledger.
-                        </div>
-                      )}
+                      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 5 }}>Trigger Event</div>
+                      <div style={{ fontSize: 12, color: '#8BA8C4', lineHeight: 1.7 }}>{alertInput.trigger_event}</div>
                     </div>
                   </div>
                 </div>
-              )}
 
-              {/* Loading State */}
-              {loading && (
-                <div className="flex-1 flex flex-col items-center justify-center text-slate-500">
-                  <div className="w-8 h-8 border-4 border-[#00AEEF] border-t-transparent rounded-full animate-spin mb-4"></div>
-                  <p className="font-bold tracking-widest uppercase text-xs animate-pulse">Running Multi-Pillar AI Models...</p>
-                </div>
-              )}
-
-              {/* The AI Output */}
-              {reportData && !loading && (
-                <>
-                  {/* Intelligence & Recommendation Panel */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
-
-                    
-                    {/* Risk Score Panel */}
-                    <div className="bg-[#FFFFFF] border-l-4 border-l-[#D03027] border-y border-r border-slate-200 rounded-sm shadow-sm p-4 flex flex-col max-h-[250px]">
-                      <h3 className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-2 flex justify-between items-center">
-                        Multi-Pillar Risk Contribution Breakdown
-                      </h3>
-                      
-                      <div className="flex items-end gap-3 mb-2">
-                        <span className="text-4xl font-bold text-[#D03027]">98%</span>
-                        <span className="text-xs text-slate-600 mb-1 font-semibold uppercase">Total Risk Score</span>
-                      </div>
-                      <div className="flex gap-2 mb-4 text-[10px] font-bold">
-                        <span className="bg-[#D03027]/10 text-[#D03027] px-2 py-0.5 rounded-sm border border-[#D03027]/20 tracking-wide">CLASSIFICATION: CRITICAL</span>
-                        <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded-sm border border-slate-200 tracking-wide">THRESHOLD: 75%</span>
-                      </div>
-
-                      <div className="space-y-1 mt-2 flex-1 overflow-y-auto pr-2">
-
-                        {reportData.ai_analysis.risk_breakdown?.map((risk, idx) => (
-                           <div 
-                             key={idx} 
-                             onClick={() => setActiveRiskFactor(activeRiskFactor === idx ? null : idx)}
-                             className="group cursor-pointer hover:bg-slate-50 p-1.5 -mx-1.5 rounded-sm transition-colors"
-                           >
-                             <div className="flex justify-between items-center text-xs">
-                               <span className="text-slate-700 border-b border-dashed border-slate-300 group-hover:border-[#00AEEF] transition-colors">
-                                 {risk.factor}
-                               </span>
-                               <span className="font-bold text-[#D03027]">+{risk.contribution_percentage}%</span>
-                             </div>
-                             
-                             {activeRiskFactor === idx && (
-                               <div className="mt-2 text-[10px] bg-slate-100 text-slate-600 p-2 rounded-sm border-l-2 border-[#00AEEF] leading-relaxed">
-                                 <span className="font-bold text-slate-700 mr-1">Pattern Detected:</span> 
-                                 {getRiskExplanation(risk.factor)}
-                               </div>
-                             )}
-                           </div>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    {/* Recommendation Badge */}
-                    <div className="bg-[#D03027] border-2 border-red-800 rounded-sm shadow-sm p-5 flex flex-col justify-center relative overflow-hidden">
-                      <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-red-600 to-transparent opacity-40 rounded-bl-full"></div>
-                      <h3 className="text-[10px] text-red-100 font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5 z-10">
-                        <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"></path></svg>
-                        System Recommendation
-                      </h3>
-                      <div className="text-2xl font-black text-white mb-3 uppercase tracking-wide z-10 drop-shadow-sm">
-                        {reportData.ai_analysis.recommendation.action}
-                      </div>
-                      <p className="text-xs text-white leading-relaxed border-l-[3px] border-red-400 pl-3 bg-red-900/40 p-2.5 rounded-r-sm z-10 font-medium">
-                        {reportData.ai_analysis.recommendation.reasoning}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Collapsible SAR Narrative Workspace */}
-                  <div className="bg-[#FFFFFF] border border-slate-200 rounded-sm shadow-sm flex flex-col flex-1">
-                    <div className="px-4 py-3 border-b border-slate-200 bg-[#00395D] text-white flex justify-between items-center">
-                      <h2 className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
-                        <svg className="w-4 h-4 text-[#00AEEF]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                        Structured SAR Narrative
-                      </h2>
-                    </div>
-                    
-                    <div className="p-2 flex-1 bg-white">
-                      <details className="group border-b border-slate-100 pb-2 mb-2 p-2" open>
-                        <summary className="text-sm font-bold text-[#00395D] cursor-pointer hover:text-[#00AEEF] list-none flex items-center gap-2">
-                           <span className="text-xs">▶</span> Background
-                        </summary>
-                        <textarea 
-                          className="w-full text-sm text-slate-700 mt-2 pl-5 py-2 leading-relaxed bg-transparent border border-transparent hover:border-slate-200 focus:outline-none focus:border-[#00AEEF] focus:bg-white rounded-sm resize-y min-h-[80px]" 
-                          defaultValue={reportData.ai_analysis.narrative.background} 
-                        />
-                      </details>
-                      
-                      <details className="group border-b border-slate-100 pb-2 mb-2 p-2" open>
-                        <summary className="text-sm font-bold text-[#00395D] cursor-pointer hover:text-[#00AEEF] list-none flex items-center gap-2">
-                           <span className="text-xs">▶</span> Transaction Timeline
-                        </summary>
-                        <textarea 
-                          className="w-full text-sm text-slate-700 mt-2 pl-5 py-2 leading-relaxed bg-transparent border border-transparent hover:border-slate-200 focus:outline-none focus:border-[#00AEEF] focus:bg-white rounded-sm resize-y min-h-[80px]" 
-                          defaultValue={reportData.ai_analysis.narrative.timeline} 
-                        />
-                      </details>
-
-                      <details className="group border-b border-slate-100 pb-2 mb-2 p-2" open>
-                        <summary className="text-sm font-bold text-[#00395D] cursor-pointer hover:text-[#00AEEF] list-none flex items-center gap-2">
-                           <span className="text-xs">▶</span> Suspicion Indicators <span className="text-[10px] font-normal text-slate-400 ml-2">(Click panel to trace evidence)</span>
-                        </summary>
-                        
-                        <div 
-                          className={`mt-2 ml-5 p-2 rounded-sm cursor-pointer transition-all ${showTrace ? 'bg-[#00AEEF]/10 border-l-[3px] border-[#00AEEF]' : 'hover:bg-slate-50 border-l-[3px] border-transparent'}`}
-                          onClick={() => setShowTrace(!showTrace)}
-                        >
-                          <textarea 
-                            className="w-full text-sm text-slate-700 leading-relaxed bg-transparent border border-transparent hover:border-slate-200 focus:outline-none focus:border-[#00AEEF] focus:bg-white rounded-sm resize-y min-h-[80px] p-1"
-                            defaultValue={reportData.ai_analysis.narrative.indicators}
-                            onClick={(e) => e.stopPropagation()} 
-                          />
-                        </div>
-
-                        {showTrace && (
-                          <div className="mt-4 ml-5 border border-[#00AEEF]/30 bg-[#F4F9FD] rounded-sm p-4 shadow-inner">
-                            <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#00395D] mb-3 flex items-center gap-2">
-                               <svg className="w-4 h-4 text-[#00AEEF]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                               AI Traceability Evidence (Multi-Pillar Match)
-                            </h4>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                               <div className="bg-white p-3 rounded-sm border border-slate-200">
-                                 <div className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1.5">Supporting Transactions</div>
-                                 <div className="text-xs font-mono text-[#D03027] font-bold">TX-9982-B & TX-9983-C</div>
-                                 <div className="text-[11px] text-slate-800 mt-1 font-medium">Targeted Entities identified.</div>
-                               </div>
-                               
-                               <div className="bg-white p-3 rounded-sm border border-slate-200">
-                                 <div className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1.5">Triggered Risk Drivers</div>
-                                 <div className="flex justify-between items-center text-[11px] mb-1">
-                                   <span className="font-semibold text-slate-700">Sanctions Match</span>
-                                   <span className="font-bold text-[#D03027]">40%</span>
-                                 </div>
-                                 <div className="flex justify-between items-center text-[11px] mb-1">
-                                   <span className="font-semibold text-slate-700">PEP Connection (ABC)</span>
-                                   <span className="font-bold text-[#D03027]">25%</span>
-                                 </div>
-                                 <div className="flex justify-between items-center text-[11px]">
-                                   <span className="font-semibold text-slate-700">Offshore Tax Routing (ATEF)</span>
-                                   <span className="font-bold text-[#D03027]">15%</span>
-                                 </div>
-                               </div>
-
-                               <div className="bg-white p-3 rounded-sm border border-slate-200">
-                                 <div className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-1.5">Policy Implementation</div>
-                                 <div className="text-[11px] font-semibold text-[#00395D] mb-1">Barclays Consolidated Standards</div>
-                                 <div className="text-[10px] text-slate-600 leading-tight">
-                                   Immediate escalation required for contraventions of UK Bribery Act (PEP), UK Criminal Finances Act (ATEF), and OFAC Sanctions.
-                                 </div>
-                               </div>
-                            </div>
-                          </div>
-                        )}
-                      </details>
-
-                      <details className="group p-2" open>
-                        <summary className="text-sm font-bold text-[#00395D] cursor-pointer hover:text-[#00AEEF] list-none flex items-center gap-2">
-                           <span className="text-xs">▶</span> Conclusion
-                        </summary>
-                        <textarea 
-                          className="w-full text-sm text-slate-700 mt-2 pl-5 py-2 leading-relaxed font-semibold bg-transparent border border-transparent hover:border-slate-200 focus:outline-none focus:border-[#00AEEF] focus:bg-white rounded-sm resize-y min-h-[60px]" 
-                          defaultValue={reportData.ai_analysis.narrative.conclusion} 
-                        />
-                      </details>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Interactive Policy Mapping */}
-                    <div className="bg-[#FFFFFF] border border-slate-200 rounded-sm shadow-sm">
-                      <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
-                        <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest">Global Policy Mapping Engine</h3>
-                      </div>
-                      <div className="p-4 space-y-3">
-                        {reportData.ai_analysis.findings?.map((finding, idx) => (
-                          <div key={idx} className="flex flex-col text-xs text-slate-700 bg-white border border-slate-200 p-3 rounded-sm shadow-sm relative">
-                            <div className="flex gap-2 items-center mb-1.5">
-                              <span className="w-2 h-2 rounded-full bg-[#D03027]"></span>
-                              <span className="font-bold uppercase">{finding.rule}</span>
-                            </div>
-                            <div className="pl-4 text-[11px] text-slate-500 mb-2">{finding.detail}</div>
-                            
-                            <div className="pl-4 border-l-2 border-[#00AEEF] ml-1">
-                              <button 
-                                onClick={() => setActivePolicySnippet(activePolicySnippet === idx ? null : idx)}
-                                className="text-[10px] font-mono text-[#00395D] bg-blue-50 hover:bg-blue-100 px-1.5 py-0.5 rounded-sm border border-blue-200 uppercase transition-colors text-left"
-                              >
-                                ↳ View {finding.policy}
-                              </button>
-                            </div>
-
-                            {activePolicySnippet === idx && (
-                               <div className="mt-2 ml-4 p-2 bg-slate-800 text-white text-[10px] rounded-sm leading-relaxed border-l-4 border-[#00AEEF]">
-                                 {finding.policy_snippet}
-                               </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Vertical Timeline */}
-                    <div className="bg-[#FFFFFF] border border-slate-200 rounded-sm shadow-sm flex flex-col h-[320px]">
-                      <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 shrink-0">
-                        <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest">Investigation Timeline</h3>
-                      </div>
-                      <div className="p-6 overflow-y-auto flex-1 bg-white">
-                        <div className="relative border-l-2 border-slate-200 ml-2 space-y-6">
-                          {reportData.audit_logs?.map((log, idx) => (
-                            <div key={idx} className="relative pl-6">
-                              <div className="absolute -left-[7px] top-0 w-3 h-3 rounded-full ring-4 ring-white bg-[#00AEEF]"></div>
-                              <div className="text-[10px] font-mono font-bold text-slate-400 mb-1">
-                                {new Date(log.timestamp).toLocaleTimeString()}
-                              </div>
-                              <div className="text-xs font-bold text-[#00395D]">{log.action}</div>
-                              <div className="text-[11px] text-slate-500 mt-1">{log.details}</div>
-                            </div>
+                {/* Transaction Ledger */}
+                <div className="card" style={{ flex: 1 }}>
+                  <SectionHeader label="Transaction Ledger">
+                    <span className="mono" style={{ fontSize: 13, fontWeight: 600, color: 'var(--white)' }}>${totalAmount.toLocaleString()}</span>
+                  </SectionHeader>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid var(--border2)' }}>
+                          {['Details', 'Amount'].map(h => (
+                            <th key={h} style={{ padding: '8px 14px', fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--muted)', textAlign: h === 'Amount' ? 'right' : 'left' }}>{h}</th>
                           ))}
-                        </div>
-                      </div>
-                    </div>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {alertInput.transactions.map((tx, idx) => (
+                          <tr key={idx} style={{ borderBottom: '1px solid var(--border2)', transition: 'background 0.15s' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                            <td style={{ padding: '12px 14px' }}>
+                              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--white)', marginBottom: 2 }}>{tx.type || 'New Transaction'}</div>
+                              <div style={{ fontSize: 11, color: 'var(--muted)' }}>{tx.destination_origin || '—'}</div>
+                              <div className="mono" style={{ fontSize: 10, color: '#3A5470', marginTop: 2 }}>{tx.tx_id}</div>
+                            </td>
+                            <td className="mono" style={{ padding: '12px 14px', fontSize: 13, fontWeight: 600, color: 'var(--white)', textAlign: 'right', verticalAlign: 'top' }}>
+                              ${Number(tx.amount).toLocaleString()}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                </>
-              )}
+                </div>
+              </div>
+
+              {/* RIGHT COLUMN */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                
+                {loading && <LoadingState />}
+
+                {!reportData && !loading && (
+                  <CaseIntakeForm
+                    alertInput={alertInput}
+                    onInputChange={handleInputChange}
+                    onTxChange={handleTxChange}
+                    onAddTx={addTransaction}
+                    onRemoveTx={removeTransaction}
+                  />
+                )}
+
+                {reportData && !loading && (
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                      <RiskBreakdown riskBreakdown={reportData.ai_analysis?.risk_breakdown} />
+                      <RecommendationCard recommendation={reportData.ai_analysis?.recommendation} />
+                    </div>
+                    <NarrativeWorkspace narrative={reportData.ai_analysis?.narrative} />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                      <PolicyMapping findings={reportData.ai_analysis?.findings} />
+                      <AuditTimeline logs={reportData.audit_logs} />
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      </main>
-    </div>
+        </main>
+      </div>
+    </>
   );
 }
 
